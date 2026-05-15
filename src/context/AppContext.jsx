@@ -56,6 +56,19 @@ function appReducer(state, action) {
     }
     case 'ADD_BODY_MEASUREMENT': return { ...state, bodyMeasurements: [action.payload, ...state.bodyMeasurements] };
     case 'ADD_CUSTOM_EXERCISE': return { ...state, customExercises: [action.payload, ...state.customExercises] };
+    // RESET_ACTIVITY: wipes all logged activity but keeps profile, goals, schedule, custom exercises
+    case 'RESET_ACTIVITY': return {
+      ...state,
+      workouts: [],
+      weightLogs: [],
+      sleepLogs: [],
+      wellnessLogs: [],
+      nutritionLogs: [],
+      bodyMeasurements: [],
+      prs: [],
+      activityFeed: [],
+      completedGoals: [],
+    };
     case 'CLEAR_ALL': return { ...generateSeedData(), profile: { ...generateSeedData().profile, onboardingComplete: false } };
     default: return state;
   }
