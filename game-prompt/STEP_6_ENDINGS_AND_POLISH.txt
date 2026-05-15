@@ -1,0 +1,448 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║   NPC: NOBODY'S STORY — STEP 6 of 6 (FINAL)                            ║
+║   7 ENDINGS + POLISH + PERFORMANCE + FINAL CHECKLIST                    ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+INSTRUCTIONS FOR AI:
+This is the final step. Steps 1-5 are complete.
+Implement all 7 endings, polish systems, and run final build.
+After this step the game must be fully playable end-to-end.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — engine/EndingCalculator.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Evaluates ending conditions on Day 30.
+Called during final gameTick.
+Returns ending ID based on game state.
+
+ENDING PRIORITY ORDER (check top to bottom, first match wins):
+
+ENDING 1: "SEEN" — The rarest, most emotional ending
+  Condition:
+    hero.noticedKael == true
+    AND kael.stats.influence >= 80
+    AND flags.kaelSaidNothing == false
+    AND hero.trust >= 60
+  Description:
+    Aldric defeats the Dark Lord.
+    During victory celebration, he walks up to Kael.
+    "The innkeeper," he says. "I don't know your name."
+    Player can type their name. Aldric says it once.
+    He walks away. The credits roll.
+    Final line: "He said your name. Once."
+    "It was enough."
+
+ENDING 2: "THE QUIET VICTORY" — Good ending, unsung
+  Condition:
+    world.darkLordPower <= 30
+    AND world.villageHope >= 70
+    AND kael.stats.influence >= 60
+    AND flags.villageWarned == true
+  Description:
+    Hero defeats Dark Lord with ease.
+    Village celebrates. Nobody mentions Kael.
+    Kael watches from tavern doorway.
+    Pip the orphan runs up and hugs Kael.
+    Nobody else sees it.
+    Final line: "The world was saved."
+    "You helped."
+    "Nobody will ever know."
+    "The child knows."
+
+ENDING 3: "THE ARCHITECT" — Bittersweet, powerful
+  Condition:
+    kael.stats.influence >= 90
+    AND flags.heroGivenFalseMap == false
+    AND flags.aldricKnowsWeakness == true
+    AND flags.miraSubplotStarted == true
+  Description:
+    Hero destroys Dark Lord using knowledge Kael gathered.
+    Camera shows every moment Kael influenced:
+    (montage of player's choices in quick cuts)
+    Hero gives speech about destiny.
+    Final line: "He said destiny guided him."
+    "You said nothing."
+    "Some people build the stage."
+    "Others just perform on it."
+
+ENDING 4: "THE FOOL'S ERRAND" — Darkly comedic
+  Condition:
+    flags.heroGivenFalseMap == true
+    AND world.darkLordPower >= 70
+    AND hero.health <= 40
+  Description:
+    Hero enters wrong dungeon. Gets lost.
+    Dark Lord begins march toward village.
+    Kael has 3 days left (bonus gameplay):
+    Can either: try to warn someone, do nothing, flee.
+    If Kael does nothing: village is taken over.
+    Kael keeps serving drinks to Dark Lord's soldiers.
+    Final line: "The world changed hands."
+    "Your hours are the same."
+    "Dawn. Serve. Dusk. Sleep."
+    "Some things don't change even when everything does."
+
+ENDING 5: "THE SACRIFICE" — Tragic heroic
+  Condition:
+    kael.stats.suspicion >= 100
+    OR (kael.stats.suspicion >= 75 AND flags.secretSold == true)
+  Description:
+    Kael's interference was noticed.
+    Not by Aldric — by the Dark Lord's spies.
+    A soldier arrives at the tavern on Day 28.
+    Kael is taken away before the final battle.
+    Hero wins. Village celebrates.
+    Nobody looks for Kael.
+    Final line: "They won."
+    "You're gone."
+    "The tavern is closed now."
+    "There's a new innkeeper. He doesn't know the regulars."
+
+ENDING 6: "THE MIRROR" — Most philosophical
+  Condition:
+    flags.miraSaidDarkLordWasNobody == true
+    AND kael.stats.knowledge >= 80
+    AND flags.kaelGaveUp == false
+    AND world.darkLordPower >= 50
+  Description:
+    Kael pieces it together: Dark Lord was once like him.
+    Nobody. Background character. Ignored for decades.
+    Unlike Kael, the Dark Lord couldn't bear it.
+    Kael faces a choice (final gameplay moment):
+      [Send Aldric the information — save world]
+      [Burn it — let the mirror break]
+      [Go yourself — walk to the castle alone]
+    Each choice gets its own 2-minute epilogue scene.
+  Final line (if sends info):
+    "You chose differently than he did."
+    "That was enough."
+
+ENDING 7: "NOBODY" — The default, honest ending
+  Condition: none of the above triggered (catch-all)
+  Description:
+    Hero defeats Dark Lord. Standard victory.
+    Village cheers. Life returns to normal.
+    Kael opens the tavern next morning.
+    Same as always.
+    Aldric rides past the village.
+    Doesn't stop.
+    Final line: "Day 31."
+    "The hero has gone."
+    "You are still here."
+    "This is the most honest ending."
+    "Most lives are this ending."
+    "You lived yours."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — components/Screens/GameOver.jsx (7 endings)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ending screen uses the 3D world as background.
+World state reflects ending (see below).
+UI fades in slowly over 5 seconds.
+
+WORLD STATE FOR EACH ENDING:
+  "SEEN"          : Castle lights warm, village cheering particles
+  "QUIET VICTORY" : Normal village, warm light, Pip visible
+  "ARCHITECT"     : Camera pans across all player's key moments
+  "FOOL'S ERRAND" : Dark soldiers visible in village, red tint
+  "SACRIFICE"     : Tavern is dark. No lights. Empty chairs.
+  "MIRROR"        : Depends on choice (3 variations)
+  "NOBODY"        : Normal village. Aldric rides past on horizon.
+
+ENDING SCREEN UI:
+  - Fade from black (3 seconds)
+  - Ending title: Cinzel, large, centered
+    (e.g. "THE QUIET VICTORY")
+  - 3-4 final narration lines, appear one at a time
+    2 second delay between each line
+    Typewriter effect, slower than dialogue
+  - After all lines: stats panel appears (parchment style):
+    "Days survived: 30"
+    "Influence exerted: {vague descriptor}"
+    "Times noticed by the hero: {0 or 1}"
+    "Lives affected: {count of NPCs helped/harmed}"
+    "Kael's name, spoken aloud: {0 or 1}"
+  - Buttons: [Play Again] [Share Ending] [Main Menu]
+  - Music: ending-specific theme fades in
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — PERFORMANCE OPTIMIZATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TARGET: 60fps on mid-range laptop (integrated graphics)
+
+LOD SYSTEM:
+  Each major object has 3 LOD levels:
+  - LOD0 (< 50 units): full detail
+  - LOD1 (50-150 units): 50% polygon reduction
+  - LOD2 (> 150 units): billboard or simple box
+
+  Use THREE.LOD class for characters and buildings.
+  Trees beyond 150 units: InstancedMesh with simplified geometry.
+
+INSTANCING:
+  - All trees: InstancedMesh (one draw call for all trunks)
+  - All grass: InstancedMesh (one draw call for all blades)
+  - All candles: InstancedMesh
+  - Rain drops: InstancedMesh
+
+FRUSTUM CULLING:
+  Three.js handles automatically, ensure:
+  - geometry.computeBoundingBox() called on all custom geometry
+  - geometry.computeBoundingSphere() called after vertex changes
+
+SHADOW OPTIMIZATION:
+  - Only 2 objects cast shadows: Kael, Aldric
+  - Buildings: receive shadows only, don't cast (perf save)
+  - Terrain: receives shadows
+
+TEXTURE OPTIMIZATION:
+  - All textures: canvas-generated, max 512x512
+  - Use MeshLambertMaterial where possible (cheaper than PBR)
+  - Reserve MeshStandardMaterial for: hero armor, water, glass
+
+GEOMETRY DISPOSAL:
+  In destroy():
+    scene.traverse(obj => {
+      if (obj.geometry) obj.geometry.dispose()
+      if (obj.material) obj.material.dispose()
+    })
+    renderer.dispose()
+
+FRAME BUDGET:
+  Physics: max 2ms/frame
+  3D render: max 10ms/frame
+  HeroAI: max 1ms/frame (spread over ticks)
+  React renders: max 2ms/frame
+  Audio: runs off main thread (AudioWorklet)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — SETTINGS PANEL (components/Screens/Settings.jsx)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GRAPHICS:
+  Shadow Quality : Off | Low | High
+  Draw Distance  : Near (300) | Medium (600) | Far (1000)
+  Grass Density  : Off | Low (10k) | High (50k)
+  Post-Processing: Off | Medium | Full
+  Bloom          : toggle
+  Film Grain     : toggle
+
+AUDIO:
+  Master Volume  : 0-100 slider
+  Music Volume   : 0-100 slider
+  SFX Volume     : 0-100 slider
+  Ambient Volume : 0-100 slider
+
+GAMEPLAY:
+  Text Speed     : Slow | Normal | Fast | Instant
+  Dialogue Skip  : toggle (auto-advance dialogue)
+  Autosave       : toggle
+  Show Hints     : toggle (disable for pure experience)
+
+ACCESSIBILITY:
+  Subtitle Size  : Small | Medium | Large
+  High Contrast  : toggle (increases UI contrast)
+  Reduce Motion  : toggle (disables particle effects)
+
+Settings persist to localStorage key 'npc_settings_v1'
+Apply immediately without requiring restart.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — FINAL POLISH DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MICRO-DETAILS THAT ELEVATE THE GAME:
+
+1. KAEL NEVER RUNS
+   Walking is Kael's fastest movement.
+   "Hurry" is just a slightly quicker walk.
+   Heroes run. NPCs walk.
+
+2. THE CAMERA ALWAYS FINDS ALDRIC
+   Even when player isn't looking at Aldric,
+   if he enters a room, the camera drifts 5 degrees toward him.
+   Subtle. Most players won't notice consciously.
+   They'll just feel it.
+
+3. KAEL'S SHADOW IS SMALLER THAN ALDRIC'S
+   Not by much. Just enough to be subconscious.
+   directionalLight shadow bias slightly different.
+
+4. THE TAVERN SIGN NEVER GETS REPAIRED
+   It's slightly crooked on Day 1.
+   It gets slightly more crooked each week.
+   Nobody comments on it.
+
+5. PIP ALWAYS WAVES AT KAEL
+   Every time Pip passes the tavern, she waves.
+   Kael waves back. Nobody sees this exchange.
+   On Day 30, if Kael is gone (Ending 5), Pip waves at empty tavern.
+
+6. ALDRIC STEPS OVER/AROUND KAEL
+   When Aldric walks past Kael, he doesn't look down.
+   He just... navigates around him, like furniture.
+
+7. THE WORLD LOG TIMESTAMP
+   Every log entry has a small timestamp.
+   But Kael's actions are NEVER logged there.
+   They're only in Kael's private journal.
+   The world doesn't notice.
+
+8. COIN COUNTER IS PIXEL-PERFECT ACCURATE
+   Every other stat is vague.
+   Coins are always exact.
+   The one thing nobody can take from Kael: accounting.
+
+9. BACKGROUND MUSIC DIPS WHEN ALDRIC ARRIVES
+   Tavern ambient music volume drops 20% when Aldric enters.
+   His heroic theme subtly overlays.
+   The world literally reshapes itself for him.
+   Even the music.
+
+10. ENDING 7 IS THE ONLY ENDING WITH NO TITLE CARD
+    All other endings display their name in large Cinzel font.
+    Ending 7: just the lines. No title.
+    Nobody narrates "Nobody."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — FINAL BUILD CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before marking complete, verify:
+
+CORE LOOP:
+  [ ] Game starts, loading screen runs world generation
+  [ ] Player can move Kael with WASD
+  [ ] Camera follows Kael in third-person
+  [ ] Aldric moves autonomously on his schedule
+  [ ] Day/night cycle advances every 3 real seconds
+  [ ] World log shows events in real time
+  [ ] Game reaches Day 30 and triggers an ending
+
+INTERACTIONS:
+  [ ] E key interacts with objects and NPCs
+  [ ] Dialogue box shows and advances on click/E
+  [ ] Choices appear and can be selected (1-4 keys)
+  [ ] Inventory opens on Tab, shows items and notes
+  [ ] Black market accessible after Day 10 via trapdoor
+  [ ] All items purchasable and usable
+
+AI:
+  [ ] Aldric follows 30-day quest timeline
+  [ ] Aldric's stats change based on Kael's actions
+  [ ] Aldric notices Kael exactly once (if conditions met)
+  [ ] Villagers follow daily schedules
+  [ ] Mira subplot triggers correctly
+  [ ] Goblin raid triggers if threat unaddressed
+
+ENDINGS:
+  [ ] All 7 endings are reachable
+  [ ] Ending screen shows correct world state
+  [ ] Stats summary shows accurate data
+  [ ] Music plays for each ending
+  [ ] [Play Again] resets game state correctly
+
+VISUALS:
+  [ ] Day/night lighting transitions smoothly
+  [ ] Weather changes affect scene correctly
+  [ ] Bloom effect visible on Aldric at all times
+  [ ] Kael has NO bloom (confirmed visually)
+  [ ] Tavern interior is explorable and detailed
+  [ ] Castle visible on horizon from village
+
+PERFORMANCE:
+  [ ] 60fps on medium settings
+  [ ] No memory leaks (run for 10+ minutes)
+  [ ] Save/load works correctly
+  [ ] Mobile layout graceful (playable on tablet)
+
+AUDIO:
+  [ ] Tavern ambient plays on game start
+  [ ] Music shifts when Aldric enters/exits
+  [ ] All action SFX play at correct moments
+  [ ] Ending music is distinct per ending
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 7 — VERCEL DEPLOYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+vercel.json (place in project root):
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+
+Build command: npm run build
+Output dir: dist
+Node version: 20.x
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 8 — HOW TO USE THESE 6 FILES WITH AN AI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RECOMMENDED WORKFLOW:
+
+SESSION 1 — Give AI: STEP_1 + STEP_2
+  Ask: "Read both files. Set up the project:
+        create folder structure, install packages,
+        write package.json, vite.config.js, index.html,
+        index.css, main.jsx, App.jsx, EventBus.js,
+        GameEngine.js skeleton, PhysicsWorld.js,
+        InputManager.js, CameraSystem.js,
+        utils/noise.js, utils/save.js, GameContext.jsx"
+  Verify: npm run dev starts without errors
+
+SESSION 2 — Give AI: STEP_3
+  Ask: "Read this file. Build the complete 3D world:
+        TerrainGen.js, WaterSystem.js, Vegetation.js,
+        all buildings (Tavern, Village, Castle,
+        BlackMarket), Lighting.js, WeatherSystem.js,
+        all character visual geometry and animations"
+  Verify: World renders, day/night works, tavern is detailed
+
+SESSION 3 — Give AI: STEP_4
+  Ask: "Read this file. Implement all character systems:
+        HeroAI.js (full 30-day behavior),
+        Kael.js (movement + interaction),
+        NPCBehavior.js (10 villagers),
+        ConsequenceEngine.js,
+        characters.js, items.js, AudioEngine.js"
+  Verify: Aldric moves autonomously, Kael responds to input
+
+SESSION 4 — Give AI: STEP_5
+  Ask: "Read this file. Build all gameplay and UI:
+        DialogueEngine.js, all dialogue trees in dialogues.js,
+        worldEvents.js (40 events),
+        GameHUD.jsx, WorldLog.jsx, StatusPanel.jsx,
+        DayTimer.jsx, Minimap.jsx, DialogueBox.jsx,
+        ChoiceMenu.jsx, InventoryPanel.jsx,
+        MainMenu.jsx, LoadingScreen.jsx"
+  Verify: Dialogues trigger, HUD shows, inventory opens
+
+SESSION 5 — Give AI: STEP_6
+  Ask: "Read this file. Implement all 7 endings,
+        EndingCalculator.js, GameOver.jsx (7 variants),
+        Settings.jsx, all polish details,
+        run final checklist, fix any issues,
+        add vercel.json"
+  Verify: All 7 endings reachable, 60fps, full playthrough works
+
+TIPS:
+  - If AI runs out of context: paste relevant STEP file again
+  - Each session = one STEP file
+  - Always verify with npm run dev before next session
+  - Keep game state types consistent across all sessions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALL 6 STEPS COMPLETE.
+"NPC: Nobody's Story" is fully specified.
+Build it. Play it. Nobody will know you made it.
+(That's kind of the point.)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

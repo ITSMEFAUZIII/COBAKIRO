@@ -1,0 +1,249 @@
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║   NPC: NOBODY'S STORY — 3D OPEN WORLD BROWSER GAME                      ║
+║   STEP 1 of 6: CONCEPT, TECH STACK, PACKAGE.JSON, VITE CONFIG           ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+INSTRUCTIONS FOR AI:
+Read this file completely before writing any code.
+After finishing this step, wait for STEP_2 before continuing.
+Do NOT skip ahead. Each step builds on the previous one.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — GAME CONCEPT (READ AND INTERNALIZE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GAME TITLE   : NPC: Nobody's Story
+GENRE        : 3D Open World Narrative Adventure
+PLATFORM     : Browser (desktop Chrome/Firefox/Edge)
+PLAY TIME    : ~30-45 minutes per run
+
+PREMISE:
+You are KAEL — a nameless tavern keeper in the medieval village
+of Ashenveil. You are an NPC in someone else's game.
+
+The "real" hero, Sir Aldric, runs his own epic adventure.
+He has glowing quest markers. He has destiny.
+He does not know you exist.
+
+Your job: survive 30 in-game days. Watch the hero's story unfold.
+Make small, invisible choices that change the world's fate.
+Never be noticed. Never be credited.
+
+CORE TENSION:
+- You have no combat stats
+- You have no quest marker
+- Nobody talks to you first
+- But you see everything the hero misses
+- Small actions compound into world-changing consequences
+
+TONE:
+Melancholic + darkly funny + philosophical.
+Like Papers Please meets Disco Elysium meets The Forgotten City.
+
+INSPIRATIONS:
+- Disco Elysium    (narrative depth, internal monologue)
+- Papers Please    (moral weight of tiny decisions)
+- The Forgotten City (NPC perspective, consequence loops)
+- Stardew Valley   (daily rhythm, world alive without player)
+- Shadow of Colossus (lonely atmosphere, big world, small you)
+
+EMOTIONAL ARC:
+- First 5 min  : Player feels invisible and unimportant
+- Minutes 5-15 : Player realizes they have hidden power
+- Minutes 15-30: Player becomes obsessed with influencing
+                 the world without being caught
+- Ending       : Profound sadness OR catharsis based on choices
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — MANDATORY TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3D ENGINE    : Three.js r165+
+PHYSICS      : cannon-es
+FRAMEWORK    : React 18 (UI/HUD layer only)
+LANGUAGE     : JavaScript ES2022 (NO TypeScript)
+BUNDLER      : Vite 5+
+STYLING      : Tailwind CSS v4 via @tailwindcss/vite (UI only)
+UI ANIMATION : Framer Motion (dialogue, panels, menus)
+3D ANIMATION : Three.js AnimationMixer
+GLOBAL STATE : React Context + useReducer
+3D STATE     : Zustand (separate from React UI state)
+STORAGE      : localStorage key = "npc_world_v1"
+AUDIO        : Howler.js + Web Audio API
+POST-PROCESS : Three.js EffectComposer (bloom, SSAO, film grain)
+FONTS        : Cinzel + Crimson Pro + JetBrains Mono (Google Fonts)
+
+STRICTLY FORBIDDEN:
+- Babylon.js, PlayCanvas, Unity WebGL, Godot
+- Any pre-made 3D asset files (.glb, .gltf, .fbx)
+  ALL geometry must be procedural (Three.js primitives + custom)
+- TypeScript
+- Chakra UI, MUI, Ant Design, or any UI component library
+- Icon libraries (inline SVG only)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — PACKAGE.JSON (write this exactly)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{
+  "name": "npc-nobodys-story",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.165.0",
+    "cannon-es": "^0.20.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "framer-motion": "^11.0.0",
+    "zustand": "^4.5.0",
+    "howler": "^2.2.4",
+    "postprocessing": "^6.36.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "vite": "^5.4.0"
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — VITE.CONFIG.JS (write this exactly)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: ['three', 'cannon-es', 'howler', 'zustand']
+  },
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          physics: ['cannon-es'],
+          react: ['react', 'react-dom', 'framer-motion'],
+        }
+      }
+    }
+  }
+})
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — INDEX.HTML (write this exactly)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NPC: Nobody's Story</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — INDEX.CSS BASE STYLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --font-title    : 'Cinzel', serif;
+  --font-body     : 'Crimson Pro', serif;
+  --font-mono     : 'JetBrains Mono', monospace;
+  --color-bg      : #0d0a07;
+  --color-wood    : #2d1b0e;
+  --color-amber   : #f59e0b;
+  --color-stone   : #1a1614;
+  --color-parch   : #e8dcc8;
+  --color-blood   : #7f1d1d;
+  --color-magic   : #4c1d95;
+  --color-npc     : #6b7280;
+  --color-gold    : #d97706;
+  --color-success : #065f46;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  color: var(--color-parch);
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Game canvas fills entire screen */
+#game-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* React UI overlay sits above canvas */
+#ui-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* CRT scanline overlay */
+#ui-overlay::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* Parchment panel style */
+.panel-parchment {
+  background: rgba(45, 27, 14, 0.92);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
+/* Medieval title font */
+.font-title  { font-family: var(--font-title); }
+.font-body   { font-family: var(--font-body); }
+.font-mono   { font-family: var(--font-mono); }
+
+/* Pointer events on interactive UI elements */
+.ui-interactive { pointer-events: all; }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 COMPLETE — PROCEED TO STEP_2_FOLDER_AND_ENGINE.txt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

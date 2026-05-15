@@ -1,0 +1,470 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║   NPC: NOBODY'S STORY — STEP 4 of 6                                     ║
+║   HERO AI + PLAYER CONTROLS + NPC BEHAVIOR + DATA FILES                 ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+INSTRUCTIONS FOR AI:
+Steps 1-3 done (stack, engine, 3D world).
+Now implement all character systems, AI, controls, and data.
+Every method listed must be FULLY implemented, no stubs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — engine/HeroAI.js (Sir Aldric's brain)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Aldric is a fully autonomous agent. He runs his own quest
+independent of the player. Player can only INFLUENCE him
+indirectly — never control him directly.
+
+ALDRIC'S 30-DAY QUEST TIMELINE (data/questScript.js):
+
+Day 01-03 | ARRIVAL
+  - Walks into Ashenveil from south road
+  - Goes to tavern, sits at bar (ignores Kael)
+  - Monologue: "I've heard there's work here."
+  - Leaves tavern at dusk, camps outside
+
+Day 04-06 | THE QUEST BEGINS
+  - Meets Elder Voss at town well, 09:00
+  - Receives quest: find the Sunfire Relic
+  - Returns to tavern, announces quest loudly
+  - Buys equipment from blacksmith
+  - Recruits villager Tom as companion
+
+Day 07-10 | GOBLIN TROUBLES
+  - Scouts forest north of village
+  - Returns with health -30 (goblin ambush)
+  - Stays in tavern 2 days to recover
+  - Demands best room (pushes out paying guest)
+  - Complains about goblins loudly every evening
+
+Day 11-15 | THE ARTIFACT HUNT
+  - Learns relic is in northern dungeon
+  - Tells everyone in tavern that evening
+  - Recruits a second companion (villager Pip's brother)
+  - Studies old map (sits at tavern corner table)
+
+Day 16-20 | INTO THE DUNGEON
+  - Leaves village at dawn, Day 16
+  - World becomes noticeably quieter
+  - Villagers ask Kael where Aldric went
+  - Kael has maximum freedom during this period
+
+Day 21-25 | TRIUMPHANT RETURN
+  - Returns Day 21 with Sunfire Relic
+  - Throws 30 gold to crowd (none to Kael)
+  - Celebration in tavern, Kael serves all night
+  - Relic gives Aldric +30% strength buff
+
+Day 26-29 | MARCH TO CASTLE
+  - Leaves village Day 26 for Dark Lord's castle
+  - Villagers line the road, cheer and wave
+  - Kael watches from tavern doorway
+  - Nobody waves at Kael
+
+Day 30 | THE RECKONING
+  - Off-screen battle
+  - Outcome = function of world state Kael created
+  - Triggers ending calculation
+
+HERO AI PATHFINDING:
+  - Simple waypoint system (not full NavMesh)
+  - Array of waypoints per day/activity
+  - Move toward current waypoint at speed 4
+  - If within 1 unit of waypoint: advance to next
+  - Avoid buildings: simple bounding box checks
+  - Pathfinding blocked? Pick slightly random direction
+
+HERO STAT MODIFIERS (triggered by Kael's actions):
+
+  ACTION: kael_served_poison_drink
+    -> hero.health -= 25
+    -> hero.health regen disabled for 2 days
+    -> Returns from dungeon visibly weakened
+    -> questStage advances slower
+
+  ACTION: kael_gave_false_map
+    -> hero goes to WRONG dungeon location Day 16
+    -> Returns empty-handed Day 20
+    -> hero.arrogance -= 20, hero.trust -= 15
+    -> questStage delayed by 4 days
+
+  ACTION: kael_spread_negative_rumor
+    -> villager.trust[aldric] -= 20
+    -> Day 21 celebration smaller
+    -> hero.gold received -= 50%
+
+  ACTION: kael_gave_hero_weapon
+    -> hero.health maxHealth += 20
+    -> Dungeon return faster (+2 days early)
+    -> hero.trust += 10
+    -> At trust > 60: hero glances at Kael once
+
+  ACTION: kael_warned_village
+    -> world.goblinThreat -= 30
+    -> Villagers alive for ending
+    -> Aldric finds cleared path
+
+PERCEPTION SYSTEM:
+  Each tick, chance Aldric notices Kael:
+    base_chance = hero.perception / 100 * 0.01 (1% max per tick)
+    modified by: kael.stats.influence / 100 * 0.05
+    if (Math.random() < chance): hero.noticedKael = true
+  
+  noticedKael triggers ONCE in entire playthrough:
+    - Aldric stops walking
+    - Turns to face Kael
+    - Holds for 3 seconds
+    - Says: "You there... have we met?"
+    - Kael can respond: [Yes] [No] [Say nothing]
+    - Then Aldric shakes head and walks away
+    - This is the most emotional moment in the game
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — characters/Kael.js (player character controller)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Kael is controlled by WASD + mouse.
+
+MOVEMENT SPEC:
+  Walk speed  : 3.5 units/sec
+  Hurry speed : 5.5 units/sec (Shift held)
+  Turn speed  : 2.5 rad/sec (with mouse)
+  Collision   : simple sphere vs AABB building checks
+
+MOVEMENT LIMITS:
+  Cannot leave world bounds (-1000 to 1000)
+  Cannot enter castle (locked until Day 26)
+  Can enter: tavern, all village buildings, dungeon entrance
+  Cannot follow Aldric into dungeon (blocked)
+
+INTERACTION RAYCAST:
+  Cast ray from camera center
+  Max distance: 2.5 units
+  Highlight hit object with outline shader
+  Show context prompt: "E - [action]"
+
+CONTEXT ACTIONS (shown based on what is hit):
+
+  Hit: Bar counter
+    Options: [1] Serve Drink [2] Clean Bar [3] Check Stock
+
+  Hit: Customer NPC (in tavern)
+    Options: [1] Serve [2] Listen [3] Spread Rumor [4] Bribe
+
+  Hit: Sir Aldric
+    Options: [1] Serve him [2] Eavesdrop [3] Slip note [4] Stare
+
+  Hit: Trapdoor (discovered)
+    Options: [E] Open trapdoor to Black Market
+
+  Hit: Notice board
+    Options: [E] Read notices
+
+  Hit: Orphan Pip (village)
+    Options: [1] Talk [2] Give coin [3] Listen to stories
+
+  Hit: Villager
+    Options: [1] Warn [2] Spread rumor [3] Trade [4] Observe
+
+KAEL'S INTERNAL MONOLOGUE:
+  Triggered randomly every 60-120 seconds game time
+  Shows as floating italic text above Kael's head briefly
+  Examples:
+    "He didn't look at me again today."
+    "I know things he will never know."
+    "Is this enough? Is any of this enough?"
+    "Day {day}. He still doesn't know my name."
+    "I changed something today. Nobody will ever know."
+    (if morale < 20): "What's the point of any of this."
+    (if influence > 80): "I can feel the weight of it now."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — engine/NPCBehavior.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+10 named villagers with daily schedules.
+
+VILLAGER TEMPLATE:
+{
+  id, name, position, homePos, workPos,
+  schedule: { dawn, morning, afternoon, dusk, night },
+  personality: string,
+  trustAldric: 80,    // starts high
+  trustKael: 20,      // starts low (nobody cares)
+  isAlive: true,
+  hasInfo: boolean    // whether they have useful secrets
+}
+
+DAILY SCHEDULE EXAMPLE (Elder Voss):
+  dawn      : walk from home to well
+  morning   : stand at well, greet people
+  afternoon : walk to tavern for lunch
+  dusk      : return home
+  night     : inside home (light in window)
+
+SCHEDULE EXAMPLE (Tom the Smith):
+  dawn      : open blacksmith fire
+  morning   : work at anvil (sparks effect)
+  afternoon : brief walk to market
+  dusk      : close shop, go to tavern
+  night     : drunk in tavern corner
+
+VILLAGER REACTIONS TO ALDRIC:
+  - Within 5 units: face toward Aldric
+  - Within 2 units: play bow animation
+  - Aldric walks by: nod and smile expression
+  - Aldric makes speech: gather around, applaud
+
+VILLAGER REACTIONS TO KAEL:
+  - Within 5 units: no reaction (normal behavior)
+  - Player initiates: dialogue opens
+  - No bowing, no gathering, no applause
+  - One villager (Mira) is exception — she sees Kael
+
+GOBLIN RAID EVENT (if world.goblinThreat >= 80):
+  Triggered on Day 8-12 (random)
+  - 5 goblin geometry shapes enter from north
+  - Villagers run indoors
+  - Aldric fights them (particle combat effect)
+  - If Kael warned village: only 2 goblins, easier
+  - If not warned: 3 villagers get "injured" (animation)
+  - Injured villagers limp for rest of game
+
+MIRA SUBPLOT:
+  Mira is the healer. She's the only NPC who notices Kael.
+  Day 5: She says "You work hard, tavern keeper."
+  Day 10: "Are you alright? You seem... troubled."
+  Day 15: Reveals she knows a secret about Dark Lord
+  Day 20: If Kael shared secrets: she has crucial information
+  Day 25: Her information can change ending outcome
+  This is the only genuine human connection Kael gets.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — engine/ConsequenceEngine.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Actions don't have immediate effects — they ripple forward in time.
+This creates the "butterfly effect" feel.
+
+CONSEQUENCE QUEUE:
+  Each Kael action registers a delayed consequence:
+  {
+    triggerDay: current_day + delay,
+    triggerHour: specific_hour,
+    action: function(state),
+    description: string (for world log)
+  }
+
+EXAMPLES:
+
+  ACTION: serve_spiked_drink to Aldric
+    Registered consequence: { triggerDay: +1, action: 
+      () => { hero.health -= 25, emit('world:event', 
+      { description: 'Sir Aldric looks pale today' }) }
+    }
+
+  ACTION: spread_rumor (dark lord stronger than reported)
+    Registered consequence: { triggerDay: +3, action:
+      () => { world.darkLordPower += 15,
+              villageHope -= 10,
+              emit('world:event', 
+              { description: 'Morale drops in the village' }) }
+    }
+
+  ACTION: warn_village_about_goblins
+    Registered consequence: { triggerDay: +2, action:
+      () => { world.goblinThreat -= 30,
+              emit('world:event',
+              { description: 'Villagers seem more prepared' }) }
+    }
+
+  ACTION: give_hero_weapon
+    Registered consequence: { triggerDay: +5, action:
+      () => { hero.maxHealth += 20,
+              if(hero.noticedKael) emit('hero:action', 
+              { action: 'grateful_nod' }) }
+    }
+
+Each tick: scan queue, execute triggered consequences, remove them.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — data/characters.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const CHARACTERS = {
+  kael: {
+    id: 'kael',
+    name: 'Kael',
+    fullName: 'Kael — Tavern Keeper',
+    description: 'Nobody knows your last name.',
+    color: '#8B7355',
+    startPos: { x: -50, y: 0, z: 10 }
+  },
+  aldric: {
+    id: 'aldric',
+    name: 'Sir Aldric',
+    fullName: 'Sir Aldric of the Golden Order',
+    description: 'The Hero. The Chosen One. You hate him a little.',
+    color: '#C0A060',
+    startPos: { x: 0, y: 0, z: -200 }
+  },
+  mira: {
+    id: 'mira',
+    name: 'Mira',
+    fullName: 'Mira the Healer',
+    description: 'The only one who sees you.',
+    color: '#7a9e7e',
+    homePos: { x: 15, y: 0, z: 30 },
+    hasInfo: true,
+    secret: 'The Dark Lord was once a tavern keeper too.'
+  },
+  elder_voss: {
+    id: 'elder_voss',
+    name: 'Elder Voss',
+    fullName: 'Elder Voss, Village Elder',
+    description: 'Gives quests to heroes. Never asked you.',
+    color: '#8b7355',
+    homePos: { x: -10, y: 0, z: -20 }
+  },
+  tom: {
+    id: 'tom',
+    name: 'Tom',
+    fullName: 'Tom the Smith',
+    description: 'Loud, strong, completely ignores you.',
+    color: '#6b4226',
+    homePos: { x: 20, y: 0, z: -15 },
+    hasInfo: false
+  },
+  pip: {
+    id: 'pip',
+    name: 'Pip',
+    fullName: 'Pip the Orphan',
+    description: 'A child. The only one who waves at you.',
+    color: '#d4956a',
+    homePos: { x: -20, y: 0, z: 15 },
+    hasInfo: false
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — data/items.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const ITEMS = {
+  poison_vial: {
+    id: 'poison_vial',
+    name: 'Vial of Nightshade',
+    description: 'Tasteless. Effective. Heavy in the pocket.',
+    cost: 15,
+    useOn: ['drink', 'food'],
+    effect: { target: 'hero', stat: 'health', value: -25, delay: 1 },
+    stackable: false,
+    icon: '🧪'
+  },
+  false_map: {
+    id: 'false_map',
+    name: 'Forged Dungeon Map',
+    description: 'Expertly wrong. He\'ll never know.',
+    cost: 25,
+    useOn: ['aldric_bag', 'notice_board'],
+    effect: { target: 'hero', flag: 'heroGivenFalseMap', delay: 0 },
+    stackable: false,
+    icon: '🗺️'
+  },
+  hero_sword: {
+    id: 'hero_sword',
+    name: 'Enchanted Blade',
+    description: 'You could give it to him. Or keep it. Why give it?',
+    cost: 50,
+    useOn: ['aldric'],
+    effect: { target: 'hero', stat: 'maxHealth', value: 20, delay: 0 },
+    keepEffect: { target: 'kael', stat: 'morale', value: -10 },
+    stackable: false,
+    icon: '⚔️'
+  },
+  informant_token: {
+    id: 'informant_token',
+    name: 'Informant\'s Token',
+    description: 'Pay daily, receive secrets. A fair trade.',
+    cost: 10,
+    effect: { target: 'kael', stat: 'knowledge', value: 5, perDay: true },
+    stackable: false,
+    icon: '🪙'
+  },
+  ancient_tome: {
+    id: 'ancient_tome',
+    name: 'Ancient Tome',
+    description: 'Contains the Dark Lord\'s real weakness.',
+    cost: 40,
+    useOn: ['mira', 'aldric_bag', 'keep'],
+    effect: { flag: 'tomeFound', knowledge: 30 },
+    stackable: false,
+    icon: '📜'
+  },
+  coin: {
+    id: 'coin',
+    name: 'Coin',
+    description: 'You earn these. Nobody notices.',
+    stackable: true,
+    icon: '💰'
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 7 — engine/AudioEngine.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Positional 3D audio using Howler.js + Web Audio API.
+
+AMBIENT SOUNDS (Web Audio API procedural):
+  Tavern ambience:
+    - Low pass filtered pink noise (crowd murmur)
+    - Random "glass clink" sounds every 5-15 seconds
+    - Fireplace crackle: brownian noise + filter
+    - Wood creak: occasional low thud
+  
+  Outdoor ambience:
+    - Wind: white noise + dynamic filter based on weather
+    - Birds: day only, random chirp intervals
+    - Rain: if weather=rain, heavy white noise
+    - Night crickets: night only, modulated sine waves
+
+HERO SOUNDS:
+  - Heroic hum: subtle musical tone when Aldric nearby
+  - Armor clink: on each step
+  - Victory fanfare: Day 21 return
+
+KAEL SOUNDS:
+  - Footstep: soft thud, wooden floor vs stone different
+  - Bottle pour: when serving drink
+  - Coin clink: when receiving payment
+  - Page turn: journal open/close
+
+MUSIC:
+  Procedural ambient music using Web Audio API oscillators:
+  
+  TAVERN THEME (day):
+    - Root: oscillators on C minor pentatonic
+    - Slow arpeggios, lute-like timbre
+    - Filter envelope gives pluck feel
+    - 64-bar generative loop
+  
+  NIGHT THEME:
+    - Same harmony, lower octave
+    - More reverb (convolver)
+    - Slower, more melancholic
+
+  HERO THEME (when Aldric in scene):
+    - Rises slightly in brightness (filter opens)
+    - Subtle heroic fanfare motif layered
+    - Volume ducks when Aldric leaves
+
+  ENDING MUSIC:
+    - 7 different short pieces per ending
+    - All variations of same melody
+    - Tone matches emotional resolution
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 COMPLETE — PROCEED TO STEP_5_GAMEPLAY_AND_DIALOGUE.txt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

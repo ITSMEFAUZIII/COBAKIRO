@@ -1,36 +1,178 @@
+/* ── Google Fonts (must be first) ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
-:root {
+/* ══════════════════════════════════════════════════════
+   THEME VARIABLES
+   Applied via [data-theme="dark"] / [data-theme="fitgram"]
+   on the <html> element.
+══════════════════════════════════════════════════════ */
+
+/* ── DARK THEME (default) ─────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'DM Mono', monospace;
+
+  /* Backgrounds */
+  --bg-base:        #0f0f0f;
+  --bg-sidebar:     #0c0c0c;
+  --bg-card:        #141414;
+  --bg-card-hover:  #181818;
+  --bg-input:       rgba(255,255,255,0.05);
+  --bg-overlay:     rgba(0,0,0,0.70);
+  --bg-tag:         rgba(255,255,255,0.05);
+
+  /* Borders */
+  --border-card:    rgba(255,255,255,0.07);
+  --border-sidebar: rgba(255,255,255,0.06);
+  --border-input:   rgba(255,255,255,0.10);
+  --border-subtle:  rgba(255,255,255,0.04);
+
+  /* Text */
+  --text-primary:   #e5e5e5;
+  --text-secondary: rgba(255,255,255,0.60);
+  --text-muted:     rgba(255,255,255,0.40);
+  --text-faint:     rgba(255,255,255,0.25);
+  --text-heading:   #ffffff;
+
+  /* Accent — Violet */
+  --accent:         #7c3aed;
+  --accent-hover:   #6d28d9;
+  --accent-light:   rgba(124,58,237,0.20);
+  --accent-border:  rgba(124,58,237,0.35);
+  --accent-glow:    rgba(124,58,237,0.15);
+  --accent-text:    #a78bfa;
+
+  /* Semantic colours */
+  --success:        #10b981;
+  --success-light:  rgba(16,185,129,0.15);
+  --warning:        #f59e0b;
+  --warning-light:  rgba(245,158,11,0.15);
+  --danger:         #f43f5e;
+  --danger-light:   rgba(244,63,94,0.15);
+  --info:           #3b82f6;
+  --info-light:     rgba(59,130,246,0.15);
+
+  /* Nav active pill */
+  --nav-active-bg:  rgba(124,58,237,0.20);
+  --nav-active-border: rgba(124,58,237,0.35);
+  --nav-active-glow:   rgba(124,58,237,0.20);
+  --nav-inactive:   rgba(255,255,255,0.50);
+
+  /* Dot-grid + ambient glow */
+  --dot-color:      rgba(255,255,255,0.06);
+  --glow-color:     rgba(124,58,237,0.15);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(124,58,237,0.40);
+
+  /* Slider thumb */
+  --slider-thumb:   #7c3aed;
+
+  /* Logo bg */
+  --logo-bg:        #7c3aed;
+  --logo-shadow:    rgba(124,58,237,0.30);
 }
 
-* {
-  box-sizing: border-box;
+/* ── FITGRAM THEME (light blue & white) ──────────────────────────────────── */
+[data-theme="fitgram"] {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  /* Backgrounds */
+  --bg-base:        #f0f7ff;
+  --bg-sidebar:     #ffffff;
+  --bg-card:        #ffffff;
+  --bg-card-hover:  #f5faff;
+  --bg-input:       #f0f7ff;
+  --bg-overlay:     rgba(15,40,80,0.55);
+  --bg-tag:         #e8f3ff;
+
+  /* Borders */
+  --border-card:    #cce3f8;
+  --border-sidebar: #d8edf9;
+  --border-input:   #b8d8f0;
+  --border-subtle:  #e4f0fa;
+
+  /* Text */
+  --text-primary:   #0f2d4a;
+  --text-secondary: #3a6080;
+  --text-muted:     #7aacc8;
+  --text-faint:     #a8cee0;
+  --text-heading:   #0a1e30;
+
+  /* Accent — Sky blue */
+  --accent:         #0ea5e9;
+  --accent-hover:   #0284c7;
+  --accent-light:   rgba(14,165,233,0.12);
+  --accent-border:  rgba(14,165,233,0.35);
+  --accent-glow:    rgba(14,165,233,0.10);
+  --accent-text:    #0284c7;
+
+  /* Semantic colours */
+  --success:        #059669;
+  --success-light:  rgba(5,150,105,0.12);
+  --warning:        #d97706;
+  --warning-light:  rgba(217,119,6,0.12);
+  --danger:         #e11d48;
+  --danger-light:   rgba(225,29,72,0.12);
+  --info:           #0ea5e9;
+  --info-light:     rgba(14,165,233,0.12);
+
+  /* Nav active pill */
+  --nav-active-bg:   rgba(14,165,233,0.12);
+  --nav-active-border: rgba(14,165,233,0.35);
+  --nav-active-glow:   rgba(14,165,233,0.08);
+  --nav-inactive:    #7aacc8;
+
+  /* Dot-grid + ambient glow */
+  --dot-color:      rgba(14,165,233,0.12);
+  --glow-color:     rgba(14,165,233,0.10);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(14,165,233,0.45);
+
+  /* Slider thumb */
+  --slider-thumb:   #0ea5e9;
+
+  /* Logo bg */
+  --logo-bg:        #0ea5e9;
+  --logo-shadow:    rgba(14,165,233,0.25);
 }
+
+/* ══════════════════════════════════════════════════════
+   BASE STYLES
+══════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+[data-theme="fitgram"] { color-scheme: light; }
 
 body {
   font-family: var(--font-sans);
-  background-color: #0f0f0f;
-  color: #e5e5e5;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
   margin: 0;
   padding: 0;
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Dot-grid background pattern */
+/* Dot-grid background */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 28px 28px;
   pointer-events: none;
   z-index: 0;
 }
 
-/* Ambient violet glow */
+/* Ambient top glow */
 body::after {
   content: '';
   position: fixed;
@@ -39,7 +181,7 @@ body::after {
   transform: translateX(-50%);
   width: 800px;
   height: 500px;
-  background: radial-gradient(ellipse at center, rgba(124,58,237,0.15) 0%, transparent 70%);
+  background: radial-gradient(ellipse at center, var(--glow-color) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -49,15 +191,15 @@ body::after {
   z-index: 1;
 }
 
-/* Scrollbar */
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 2px; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
+}
 
-/* Number font class */
-.font-mono { font-family: var(--font-mono); }
-
-/* Custom range slider */
+/* ── Range slider ──────────────────────────────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -65,7 +207,7 @@ input[type="range"] {
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  background: rgba(255,255,255,0.1);
+  background: var(--border-input);
   height: 4px;
   border-radius: 2px;
 }
@@ -73,11 +215,84 @@ input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   margin-top: -6px;
-  background-color: #7c3aed;
+  background-color: var(--slider-thumb);
   height: 16px;
   width: 16px;
   border-radius: 50%;
 }
 
-/* Smooth transitions */
-* { transition-property: background-color, border-color, opacity; transition-duration: 150ms; }
+/* ── Smooth colour transitions ────────────────────────────────────────────── */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, opacity, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* ── Theme-driven utility classes used across components ──────────────────── */
+
+/* Cards */
+.t-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 1rem;
+}
+.t-card:hover { background-color: var(--bg-card-hover); }
+
+/* Sidebar */
+.t-sidebar {
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-sidebar);
+}
+
+/* Inputs */
+.t-input {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.t-input::placeholder { color: var(--text-faint); }
+.t-input:focus { border-color: var(--accent); }
+
+/* Primary button */
+.t-btn-primary {
+  background-color: var(--accent);
+  color: #ffffff;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+.t-btn-primary:hover { background-color: var(--accent-hover); }
+
+/* Ghost button */
+.t-btn-ghost {
+  background-color: var(--bg-tag);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-input);
+  border-radius: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.t-btn-ghost:hover { background-color: var(--border-input); }
+
+/* Text helpers */
+.t-text-primary   { color: var(--text-primary); }
+.t-text-secondary { color: var(--text-secondary); }
+.t-text-muted     { color: var(--text-muted); }
+.t-text-accent    { color: var(--accent-text); }
+.t-text-heading   { color: var(--text-heading); }
+
+/* font */
+.font-mono { font-family: var(--font-mono); }

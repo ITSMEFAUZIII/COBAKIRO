@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppProvider, useApp } from './context/AppContext';
 import { ToastProvider } from './components/Toast';
+import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/Layout';
 import Onboarding from './components/Onboarding';
 import Dashboard from './pages/Dashboard';
@@ -56,10 +57,10 @@ function AppInner() {
 
   if (!state) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#0f0f0f]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white font-bold text-lg animate-pulse">G</div>
-          <div className="text-white/40 text-sm">Loading GymLife...</div>
+      <div style={{ position:'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg-base)' }}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:18, animation:'pulse 1.5s infinite' }}>G</div>
+          <div style={{ color:'var(--text-muted)', fontSize:14 }}>Loading GymLife...</div>
         </div>
       </div>
     );
@@ -85,11 +86,11 @@ function AppInner() {
       </Layout>
 
       {/* Keyboard shortcuts hint */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 hidden md:flex items-center gap-3 text-xs text-white/20 pointer-events-none">
-        <kbd className="px-1.5 py-0.5 rounded border border-white/10 font-mono">D</kbd>
+      <div style={{ position:'fixed', bottom:16, left:'50%', transform:'translateX(-50%)', display:'flex', alignItems:'center', gap:12, fontSize:12, color:'var(--text-faint)', pointerEvents:'none' }} className="hidden md:flex">
+        <kbd style={{ padding:'2px 6px', borderRadius:4, border:'1px solid var(--border-input)', fontFamily:'var(--font-mono)' }}>D</kbd>
         <span>Dashboard</span>
-        <span className="opacity-50">·</span>
-        <kbd className="px-1.5 py-0.5 rounded border border-white/10 font-mono">N</kbd>
+        <span style={{ opacity:0.5 }}>·</span>
+        <kbd style={{ padding:'2px 6px', borderRadius:4, border:'1px solid var(--border-input)', fontFamily:'var(--font-mono)' }}>N</kbd>
         <span>New Workout</span>
       </div>
     </>
@@ -98,10 +99,12 @@ function AppInner() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <ToastProvider>
-        <AppInner />
-      </ToastProvider>
-    </AppProvider>
+    <ThemeProvider>
+      <AppProvider>
+        <ToastProvider>
+          <AppInner />
+        </ToastProvider>
+      </AppProvider>
+    </ThemeProvider>
   );
 }

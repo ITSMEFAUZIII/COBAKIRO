@@ -1,0 +1,468 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║   NPC: NOBODY'S STORY — STEP 5 of 6                                     ║
+║   GAMEPLAY SYSTEMS + DIALOGUE ENGINE + HUD + WORLD EVENTS               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+INSTRUCTIONS FOR AI:
+Steps 1-4 done (stack, engine, world, characters).
+Now implement all gameplay systems, dialogue, UI components,
+and world events. Write complete, functional code.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — engine/DialogueEngine.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Branching dialogue system. Drives all conversations and narration.
+
+DIALOGUE NODE STRUCTURE:
+{
+  id: string,
+  trigger: {
+    day: number | [number, number],   // exact day or range
+    hour: number | null,               // null = any hour
+    location: string | null,
+    flags: string[],                   // required flags to be true
+    character: string | null           // who initiates
+  },
+  lines: [
+    {
+      speaker: 'NARRATOR' | 'KAEL' | 'ALDRIC' | npc_id,
+      text: string,            // supports {day}, {coins} etc
+      emotion: 'neutral' | 'happy' | 'sad' | 'angry' | 'bitter'
+    }
+  ],
+  choices: [
+    {
+      id: string,
+      text: string,            // shown to player
+      condition: string | null, // flag/stat condition
+      effects: {
+        flags: {},              // flags to set
+        stats: {},              // kael stats to change
+        worldStats: {},         // world stats to change
+        addItem: string | null,
+        removeItem: string | null,
+        startDialogue: string | null  // chain to another dialogue
+      },
+      nextNode: string | null   // null = end dialogue
+    }
+  ]
+}
+
+DIALOGUE ENGINE METHODS:
+  startDialogue(id, gameState)
+    - Find dialogue by id
+    - Check trigger conditions
+    - Emit 'dialogue:start'
+    - Push to React state via dispatch
+    - Lock player movement
+
+  advance()
+    - Move to next line in current node
+    - If no more lines: show choices
+    - If no choices: end dialogue
+
+  selectChoice(choiceId)
+    - Apply effects to gameState
+    - If nextNode: load next dialogue node
+    - Else: end dialogue
+    - Emit 'kael:action' with choice data
+
+  endDialogue()
+    - Emit 'dialogue:end'
+    - Unlock player movement
+    - Clear from React state
+
+TEXT PROCESSING:
+  - Replace {day} with current day
+  - Replace {coins} with kael.stats.coins
+  - Replace {heroName} with hero.name
+  - Replace {influence} with vague descriptor:
+      0-20: "nothing"
+      21-40: "a whisper"
+      41-60: "a current"
+      61-80: "a tide"
+      81-100: "a force"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — data/dialogues.js (key dialogue trees)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Write at least 20 full dialogue trees. Key ones below:
+
+1. INTRO_MONOLOGUE (Day 1, auto-triggers on game start)
+Speaker: NARRATOR
+Lines:
+  "Day one. The sun rises over Ashenveil, same as always."
+  "You are Kael. Nobody important."
+  "You run The Grey Flagon. You have run it for eleven years."
+  "Today, a hero is supposed to arrive."
+  "They always arrive eventually."
+  "They never remember your name after they leave."
+  "You have stopped expecting them to."
+Choices: none (auto-advances)
+
+2. ALDRIC_FIRST_ARRIVAL (Day 1, hour 14, Aldric enters tavern)
+Speaker: ALDRIC
+Lines:
+  "You there! Innkeeper!"
+  "Ale. The best you have. I've been walking all day."
+  [NARRATOR]: "He doesn't say please."
+  [NARRATOR]: "He never does."
+Choices:
+  a) [Serve him silently]
+     effect: coins +2, morale -1
+     next: ALDRIC_TAKES_DRINK_IGNORES_KAEL
+  b) [Say: 'Long journey?']
+     effect: knowledge +1
+     next: ALDRIC_BRIEF_ACKNOWLEDGMENT
+  c) [Serve him the spiked drink] (requires: poison_vial in inventory)
+     effect: flag heroWasPoisoned=true, remove poison_vial
+     next: ALDRIC_TAKES_DRINK_IGNORES_KAEL
+
+3. ALDRIC_BRIEF_ACKNOWLEDGMENT
+Speaker: ALDRIC
+Lines:
+  "Long? Ha. Three days from the capital. Destiny doesn't wait."
+  [ALDRIC turns away]
+  [NARRATOR]: "He's already forgotten you said anything."
+Choices: none
+
+4. MIRA_FIRST_CONTACT (Day 5, near village well)
+Speaker: MIRA
+Lines:
+  "You know, I've noticed you."
+  [NARRATOR]: "You almost drop your bucket."
+  "You work harder than anyone in this village."
+  "The hero gets all the praise. But the tavern doesn't run itself."
+Choices:
+  a) ["Thank you. That means... a lot."]
+     effect: morale +10, flag miraSubplotStarted=true
+     next: MIRA_RESPONSE_WARM
+  b) ["People see what they want to see."]
+     effect: knowledge +2, flag miraSubplotStarted=true
+     next: MIRA_RESPONSE_PHILOSOPHICAL
+  c) [Say nothing. Nod. Walk away.]
+     effect: morale +3
+     next: null
+
+5. MIRA_RESPONSE_WARM
+Speaker: MIRA
+  "Yes. It does."
+  [NARRATOR]: "She smiles. A real one."
+  [NARRATOR]: "You haven't seen one of those in a while."
+  [NARRATOR]: "Directed at you, I mean."
+
+6. KAEL_DAILY_MORNING (random mornings, 07:00)
+Speaker: NARRATOR (internal monologue)
+Lines vary by day:
+  Day 1-5:  "Another day. Another hero who won't look at you."
+  Day 6-10: "The goblins are getting closer. He doesn't know yet."
+  Day 11-15:"You know where the relic is. He's about to find out."
+  Day 16-20:"He's gone. The village feels different. Lighter."
+             "Or maybe that's just you."
+  Day 21-25:"He's back. Louder than before. Richer than before."
+             "Same amount of interest in you. None."
+  Day 26-30:"Thirty days."
+             "Thirty days of watching someone else's story."
+             "Tomorrow it ends. One way or another."
+
+7. ALDRIC_NOTICES_KAEL (triggers once if hero.noticedKael=true)
+Speaker: ALDRIC (stops walking, turns to face Kael)
+Lines:
+  "You there..."
+  [long pause — camera slowly zooms]
+  "Have we... met before?"
+  [NARRATOR]: "Your heart stops."
+  [NARRATOR]: "For one second, in thirty days, he sees you."
+Choices:
+  a) ["Yes. Every day for a month."]
+     effect: influence +20, suspicion +10
+     next: ALDRIC_RESPONSE_CONFUSED
+  b) ["No. I'm nobody."]
+     effect: morale -15, suspicion -5
+     next: ALDRIC_RESPONSE_MOVES_ON
+  c) [Say nothing. Look at your hands.]
+     effect: morale -5, flag kaelSaidNothing=true
+     next: ALDRIC_RESPONSE_MOVES_ON
+
+8. ALDRIC_RESPONSE_CONFUSED
+Speaker: ALDRIC
+  "Hm. Strange. You look familiar somehow."
+  [He squints at you for 3 seconds]
+  [He shakes his head]
+  "Nevermind. Carry on, innkeeper."
+  [He walks away]
+  [NARRATOR]: "Innkeeper."
+  [NARRATOR]: "Not even a name."
+
+9. ALDRIC_RESPONSE_MOVES_ON
+Speaker: NARRATOR
+  "He nods. He turns. He walks away."
+  "He will not look at you again."
+  "This was your one moment."
+  "You choose how you feel about how you used it."
+  [no choices — player sits with it]
+
+10. MIRA_DARK_LORD_SECRET (Day 15, flag miraSubplotStarted=true)
+Speaker: MIRA
+  "I need to tell you something."
+  "Something I've never told the hero."
+  "The Dark Lord... he wasn't born evil."
+  "He was a farmer. A shepherd. A nobody."
+  "Just like..."
+  [She stops]
+  [NARRATOR]: "She doesn't finish the sentence."
+  [NARRATOR]: "She doesn't have to."
+Choices:
+  a) ["Tell Aldric. He should know."]
+     effect: flag aldricKnowsWeakness=true, knowledge +15
+     next: MIRA_APPROVES
+  b) ["Keep this. It might be more useful with me."]
+     effect: knowledge +25, influence +10
+     next: MIRA_UNCERTAIN
+  c) ["It doesn't matter. He's the hero. Not me."]
+     effect: morale -20, flag kaelGaveUp=true
+     next: MIRA_SAD
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — data/worldEvents.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+40+ world events. Each has:
+  id, day, hour, condition, description, severity, effects
+
+KEY EVENTS:
+
+{ id:'goblin_scout', day:7, hour:10,
+  description:'Goblin scouts spotted near north road.',
+  severity:'warning',
+  effects:{ goblinThreat:+15 } }
+
+{ id:'goblin_raid', day:[9,12], hour:14,
+  condition: 'goblinThreat >= 70',
+  description:'Goblins attack the market!',
+  severity:'danger',
+  effects:{ villageHope:-20, npcInjured:'tom' } }
+
+{ id:'goblin_raid_prevented', day:[9,12],
+  condition: 'goblinThreat < 40 AND flags.villageWarned',
+  description:'Villagers repelled a goblin scouting party.',
+  severity:'success',
+  effects:{ villageHope:+15, kael_influence:+10 } }
+
+{ id:'aldric_departs', day:16, hour:6,
+  description:'Sir Aldric has left for the northern dungeon.',
+  severity:'info' }
+
+{ id:'dark_lord_advances', day:18, hour:0,
+  description:'Darkness spreads further from the castle.',
+  severity:'warning',
+  effects:{ darkLordPower:+10 } }
+
+{ id:'merchant_arrives', day:[5,8,15,22],
+  description:'A traveling merchant sets up in the market.',
+  severity:'info',
+  shopAvailable: true }
+
+{ id:'storm_night', day:[11,20],
+  description:'A violent storm keeps everyone indoors.',
+  effects:{ weather:'storm', aldricStaysInTavern:true } }
+
+{ id:'aldric_return', day:21, hour:14,
+  description:'Sir Aldric returns triumphant from the dungeon.',
+  severity:'success',
+  effects:{ villageHope:+30, hero_gold:+100 } }
+
+{ id:'orphan_pip_birthday', day:12,
+  description:"It's the orphan's birthday. Nobody noticed.",
+  severity:'quiet',
+  effects:{ mood:'bittersweet' } }
+
+{ id:'final_march', day:26, hour:8,
+  description:'Sir Aldric departs for the Dark Lord\'s castle.',
+  severity:'climax',
+  effects:{ phase:'endgame' } }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — components/HUD/GameHUD.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Master HUD component. Renders all overlay UI.
+Pointer-events: none on container, 'all' only on interactive elements.
+
+LAYOUT:
+  TOP-LEFT    : DayTimer (day + time of day)
+  TOP-RIGHT   : WorldLog (scrolling event feed)
+  BOTTOM-LEFT : StatusPanel (Kael's vague stats)
+  BOTTOM-RIGHT: Minimap (small canvas)
+  BOTTOM-CENTER: ContextPrompt (E to interact)
+  CENTER-BOTTOM: DialogueBox (when active)
+  CENTER-TOP  : NarratorText (internal monologue, fades)
+
+DayTimer component:
+  Shows: "Day 7 — Late Afternoon"
+  Uses Cinzel font, parchment background
+  Small hourglass icon (SVG inline)
+  Animated: slight glow when day changes
+
+WorldLog component:
+  Right panel, 200px wide, max-height 300px
+  Scrolling list of recent world events
+  Each entry: small icon + text + fade-in animation
+  Color codes:
+    info    : #e8dcc8 (parchment)
+    warning : #f59e0b (amber)
+    danger  : #ef4444 (red)
+    success : #10b981 (green)
+    quiet   : #6b7280 (grey — subdued events)
+  Max 20 entries, oldest fade out
+
+StatusPanel component:
+  Shows ONLY: Coins: {n}
+  Everything else is VAGUE deliberately:
+    Influence: shows as "a whisper" / "a current" / "a tide"
+    Suspicion: shown as "All quiet" / "Uneasy" / "DANGER"
+    Morale: shown as a subtle face emoji (😶😐🙁😞)
+  Font: JetBrains Mono
+  Parchment background panel
+
+Minimap component:
+  Small 150x150 canvas in corner
+  Top-down 2D view:
+    - Green dot: Kael position
+    - Gold dot: Aldric position
+    - Grey dots: other NPCs
+    - Brown shapes: buildings (simplified)
+    - Dark shape: tavern (Kael's home)
+  Updates every second (not every frame)
+  Fog of war: unexplored areas dark
+
+ContextPrompt component:
+  Appears center-bottom when raycast hits interactive object
+  Format: "[E] — Interact with {objectName}"
+  Framer Motion: fade in/out with AnimatePresence
+  Parchment style, small
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — components/Dialogue/DialogueBox.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Classic RPG dialogue box at bottom of screen.
+Visible only when activeDialogue is not null.
+
+VISUAL:
+  - Full width minus margins, height 180px
+  - Parchment background with aged texture (CSS)
+  - Medieval border: double line, corner ornaments (CSS)
+  - Speaker name: top-left, Cinzel bold, amber color
+  - Text: Crimson Pro 18px, parchment color
+  - Text animates in character by character (typewriter)
+    Speed: 30ms per character
+    Skip: click/E to show full text immediately
+  - "Continue" indicator: small triangle bottom-right, blinks
+
+CHOICE MENU (ChoiceMenu.jsx):
+  Appears below dialogue text when choices available
+  Each choice: numbered button [1] [2] [3] [4]
+  Style: dark wood background, amber text
+  Hover: slight glow
+  Framer Motion: staggered fade-in for choices
+  Keyboard: 1-4 keys select choices
+  Unavailable choices: greyed out with requirement shown
+
+NARRATOR component (separate):
+  Internal monologue — Kael's thoughts
+  Position: top-center of screen
+  Style: italic, small, fades in/out over 4 seconds
+  NO background panel (floats in world)
+  Font: Crimson Pro italic
+  Color: rgba(232, 220, 200, 0.85)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — components/Inventory/InventoryPanel.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Opens on Tab key. Styled as Kael's worn leather journal.
+
+LAYOUT:
+  Full-screen overlay, semi-transparent dark background
+  Journal: centered, 600x400px
+  Left page: INVENTORY (items Kael is carrying)
+  Right page: NOTES (things Kael has observed)
+
+INVENTORY PAGE:
+  Grid of 12 item slots
+  Each slot: icon + name + count
+  Click item: shows description (ItemTooltip)
+  Items from ITEMS data
+
+NOTES PAGE:
+  Scrollable text, handwriting-style font
+  Auto-populated from kael.knownSecrets
+  Example entries:
+    "Day 3: Aldric mentioned the relic is in the north."
+    "Day 5: Mira noticed me. Strange."
+    "Day 10: Found a trapdoor. Haven't told anyone."
+  Tone: Kael's observations, slightly melancholic
+
+TABS at top: [Inventory] [Notes] [World Map]
+
+WORLD MAP tab:
+  Simplified top-down map of Ashenveil area
+  Drawn in canvas with parchment style
+  Locations Kael has visited are revealed
+  Unvisited: foggy/sketchy
+  Castle always visible (too big to miss)
+  X markers for known secrets (like trapdoor)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 7 — components/Screens/MainMenu.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The main menu is itself a gameplay moment.
+Player sees the game world in background (blurred).
+Aldric walks past in background, glowing — ignoring camera.
+
+LAYOUT:
+  Background: live 3D scene (tavern exterior, dawn)
+  Center: title card with parchment texture
+  Title: "NPC" — large Cinzel font
+  Subtitle: "Nobody's Story" — smaller, italic
+  Below: game tagline rotates through:
+    "You are not the hero."
+    "You never were."
+    "But you were always there."
+
+BUTTONS:
+  [New Game]     -> fade to loading screen
+  [Continue]     -> only shown if save exists
+  [Options]      -> opens settings panel
+  [?]            -> shows credits (minimal, handwritten style)
+
+AMBIENT: tavern music plays softly
+Aldric passes through background every 30 seconds
+He glances at camera briefly then ignores it.
+(Foreshadowing the whole game.)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 8 — components/Screens/LoadingScreen.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Shows while world generates. Makes generation feel intentional.
+
+VISUAL:
+  Black background
+  Center: animated ink drawing of tavern (CSS animation)
+  Progress: handwritten text counting steps:
+    "Raising the mountains..."
+    "Growing the forest..."
+    "Building the village..."
+    "Hiring the hero..."
+    "Forgetting the innkeeper..."    <- pause here 1 extra second
+    "Ashenveil is ready."
+  Progress bar: quill-drawn line growing across parchment
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 COMPLETE — PROCEED TO STEP_6_ENDINGS_AND_POLISH.txt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
