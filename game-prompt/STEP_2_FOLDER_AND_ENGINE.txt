@@ -1,0 +1,450 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║   NPC: NOBODY'S STORY — STEP 2 of 6                                     ║
+║   FOLDER STRUCTURE + CORE ENGINE FILES                                   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+INSTRUCTIONS FOR AI:
+You have completed STEP 1 (concept, stack, package.json, vite config).
+Now create ALL folders and ALL engine files listed below.
+Write complete, fully-implemented code — no placeholders.
+After finishing this step, proceed to STEP_3.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — COMPLETE FOLDER STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+src/
+├── main.jsx
+├── App.jsx
+├── index.css
+├── engine/
+│   ├── GameEngine.js
+│   ├── Renderer.js
+│   ├── WorldBuilder.js
+│   ├── CharacterSystem.js
+│   ├── HeroAI.js
+│   ├── NPCBehavior.js
+│   ├── PhysicsWorld.js
+│   ├── CameraSystem.js
+│   ├── InputManager.js
+│   ├── AudioEngine.js
+│   ├── WeatherSystem.js
+│   ├── DialogueEngine.js
+│   ├── ConsequenceEngine.js
+│   ├── EndingCalculator.js
+│   └── EventBus.js
+├── world/
+│   ├── terrain/
+│   │   ├── TerrainGen.js
+│   │   ├── Biomes.js
+│   │   └── WaterSystem.js
+│   ├── buildings/
+│   │   ├── Tavern.js
+│   │   ├── Village.js
+│   │   ├── Castle.js
+│   │   ├── Dungeon.js
+│   │   └── BlackMarket.js
+│   └── props/
+│       ├── Furniture.js
+│       ├── Vegetation.js
+│       └── Lighting.js
+├── characters/
+│   ├── Kael.js
+│   ├── SirAldric.js
+│   ├── Villagers.js
+│   └── Merchants.js
+├── context/
+│   ├── GameContext.jsx
+│   └── UIContext.jsx
+├── components/
+│   ├── HUD/
+│   │   ├── GameHUD.jsx
+│   │   ├── StatusPanel.jsx
+│   │   ├── WorldLog.jsx
+│   │   ├── DayTimer.jsx
+│   │   └── Minimap.jsx
+│   ├── Dialogue/
+│   │   ├── DialogueBox.jsx
+│   │   ├── ChoiceMenu.jsx
+│   │   └── Narrator.jsx
+│   ├── Inventory/
+│   │   ├── InventoryPanel.jsx
+│   │   └── ItemTooltip.jsx
+│   └── Screens/
+│       ├── MainMenu.jsx
+│       ├── LoadingScreen.jsx
+│       ├── PauseMenu.jsx
+│       ├── GameOver.jsx
+│       └── Settings.jsx
+├── data/
+│   ├── dialogues.js
+│   ├── worldEvents.js
+│   ├── characters.js
+│   ├── items.js
+│   ├── endings.js
+│   └── questScript.js
+└── utils/
+    ├── math.js
+    ├── noise.js
+    ├── save.js
+    └── debug.js
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — src/main.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — src/App.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+App.jsx is the root component. It:
+1. Creates a <canvas id="game-canvas"> for Three.js
+2. Overlays <div id="ui-overlay"> for React HUD
+3. Initializes GameEngine on mount (useEffect)
+4. Passes engine ref to GameContext
+5. Renders correct screen based on gamePhase state:
+   - 'menu'    -> <MainMenu />
+   - 'loading' -> <LoadingScreen />
+   - 'playing' -> <GameHUD />
+   - 'paused'  -> <PauseMenu />
+   - 'ended'   -> <GameOver />
+
+Implement App.jsx with:
+- useRef for canvasRef and engineRef
+- useEffect that calls: engine.init(canvas) then engine.start()
+- useEffect cleanup that calls: engine.destroy()
+- GameProvider wrapping everything
+- AnimatePresence for screen transitions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — engine/EventBus.js (write first, others depend on it)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Singleton pub/sub event system.
+
+class EventBus {
+  constructor() { this.listeners = {} }
+  on(event, callback)     // subscribe
+  off(event, callback)    // unsubscribe
+  emit(event, data)       // publish to all listeners
+  once(event, callback)   // subscribe once then auto-remove
+  clear(event)            // remove all listeners for event
+}
+
+export default new EventBus()
+
+EVENTS USED IN GAME (emit these at correct times):
+  'game:tick'          data: { day, hour, tick }
+  'game:phase'         data: { phase }
+  'hero:moved'         data: { position, location }
+  'hero:action'        data: { action, target }
+  'hero:noticed_kael'  data: {}
+  'kael:action'        data: { action, cost, effect }
+  'world:event'        data: { id, description, severity }
+  'world:day_changed'  data: { day }
+  'npc:died'           data: { npcId, cause }
+  'dialogue:start'     data: { dialogueId }
+  'dialogue:end'       data: { dialogueId, choices }
+  'ending:triggered'   data: { endingId }
+  'weather:changed'    data: { type }
+  'ui:notification'    data: { message, type }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — engine/GameEngine.js (master controller)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GameEngine is the central class. It owns all subsystems.
+
+TICK RATE: 1 game hour = 3000ms real time
+           1 game day  = 24 ticks = 72 seconds real time
+           Total game  = 30 days = 2160 ticks = ~36 minutes
+
+INITIAL GAME STATE (full object — implement exactly):
+
+const INITIAL_STATE = {
+  phase: 'menu',       // menu|loading|playing|paused|ended
+  time: {
+    day: 1,
+    hour: 6,
+    totalTicks: 0,
+    phase: 'dawn'      // dawn|morning|afternoon|dusk|night
+  },
+  kael: {
+    position: { x: -50, y: 0, z: 10 },
+    stats: {
+      coins: 15,
+      influence: 0,    // 0-100 HIDDEN from player UI
+      suspicion: 0,    // 0-100 HIDDEN (100 = bad ending forced)
+      knowledge: 0,    // 0-100 HIDDEN
+      morale: 50,      // 0-100 HIDDEN
+    },
+    inventory: [],
+    actionsToday: [],
+    knownSecrets: [],
+    reputation: {}
+  },
+  hero: {
+    name: 'Sir Aldric',
+    position: { x: 0, y: 0, z: 0 },
+    questStage: 1,
+    health: 100,
+    maxHealth: 100,
+    arrogance: 85,
+    perception: 20,
+    trust: 40,
+    gold: 200,
+    currentActivity: 'traveling',
+    isInTavern: false,
+    noticedKael: false,
+    noticedCount: 0
+  },
+  world: {
+    goblinThreat: 30,
+    darkLordPower: 40,
+    villageHope: 60,
+    activeEvents: [],
+    completedEvents: [],
+    deadNPCs: [],
+    alteredFacts: {}
+  },
+  flags: {
+    aldricKnowsArtifact: false,
+    kaelVisitedBlackMarket: false,
+    miraSubplotStarted: false,
+    heroWasPoisoned: false,
+    trapdoorDiscovered: false,
+    heroGivenFalseMap: false,
+    villageWarned: false,
+    orphanHelped: false,
+    secretSold: false,
+    heroWeaponGiven: false
+  }
+}
+
+GameEngine METHODS to implement fully:
+
+constructor(canvas, dispatch)
+  - Store canvas and React dispatch
+  - Initialize all subsystems
+  - Set up state from localStorage or INITIAL_STATE
+
+init()
+  - Build 3D world (WorldBuilder)
+  - Spawn characters (CharacterSystem)
+  - Start audio (AudioEngine)
+  - Set up physics (PhysicsWorld)
+  - Configure post-processing (Renderer)
+
+start()
+  - Set phase to 'playing'
+  - Begin RAF render loop
+  - Start game tick interval (every 3000ms)
+
+update(deltaTime)  [called every RAF frame]
+  1. physics.step(deltaTime)
+  2. heroAI.update(deltaTime)
+  3. npcBehavior.update(deltaTime)
+  4. camera.update(deltaTime)
+  5. weather.update(deltaTime)
+  6. audio.update(camera.position)
+  7. renderer.render()
+
+gameTick()  [called every 3000ms]
+  1. state.time.hour++
+  2. if hour >= 24: day++, hour = 0, emit 'world:day_changed'
+  3. Update time phase (dawn/morning/afternoon/dusk/night)
+  4. heroAI.tick(state)
+  5. Run worldEvents check
+  6. consequenceEngine.tick(state)
+  7. endingCalculator.check(state)
+  8. emit 'game:tick' with current time
+  9. save.autosave(state)
+  10. state.time.totalTicks++
+
+destroy()
+  - Cancel RAF
+  - Clear tick interval
+  - Dispose Three.js objects
+  - Remove event listeners
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — engine/Renderer.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Renderer wraps Three.js WebGLRenderer + EffectComposer.
+
+SETUP:
+- WebGLRenderer: antialias:true, shadowMap:PCFSoftShadowMap
+- Scene: fog (0x0d0a07, 80, 600)
+- Camera: PerspectiveCamera(60, aspect, 0.1, 1000)
+- EffectComposer passes in order:
+  1. RenderPass(scene, camera)
+  2. SSAOPass — kernelRadius:16, minDist:0.005, maxDist:0.1
+  3. UnrealBloomPass — threshold:0.4, strength:1.5, radius:0.8
+  4. FilmPass — noise:0.15, grayscale:false
+  5. OutputPass
+
+COLOR GRADING per time phase:
+  dawn      : renderer.toneMappingExposure = 0.8, warm amber
+  morning   : renderer.toneMappingExposure = 1.0, neutral
+  afternoon : renderer.toneMappingExposure = 1.1, bright
+  dusk      : renderer.toneMappingExposure = 0.7, orange-red
+  night     : renderer.toneMappingExposure = 0.3, deep blue
+
+SKY:
+  Use THREE.Sky from three/examples/jsm/objects/Sky.js
+  turbidity: 10, rayleigh: 3, mieCoefficient: 0.005
+  Sun position changes with time of day
+
+SHADOWS:
+  directionalLight.castShadow = true
+  shadow.mapSize = 2048x2048
+  shadow.camera bounds = -200 to 200
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 7 — engine/PhysicsWorld.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cannon-ES physics wrapper.
+
+- World gravity: (0, -9.82, 0)
+- Broadphase: NaiveBroadphase
+- Solver iterations: 10
+- Fixed timestep: 1/60
+
+Methods:
+  addBody(body)
+  removeBody(body)
+  step(deltaTime)
+  createGroundPlane()    -> flat ground for village
+  createBoxCollider(w,h,d, position) -> for buildings
+  createCapsuleCollider(r, h)        -> for characters
+  syncMeshToBody(mesh, body)         -> update 3D from physics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 8 — engine/InputManager.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Handles all keyboard + mouse input.
+
+KEY BINDINGS:
+  W / ArrowUp    -> move forward
+  S / ArrowDown  -> move backward
+  A / ArrowLeft  -> rotate left
+  D / ArrowRight -> rotate right
+  Shift          -> hurry modifier (x1.5 speed)
+  E              -> interact
+  F              -> action menu
+  Tab            -> toggle journal/inventory
+  Escape         -> pause
+  1,2,3,4        -> quick actions
+
+MOUSE:
+  Left drag      -> orbit camera
+  Scroll         -> zoom camera (min 2, max 8 units)
+  Click          -> confirm interaction
+
+POINTER LOCK:
+  Lock pointer on game start for immersive camera control
+  Release on pause/dialogue/menu
+
+Methods:
+  init()
+  update()
+  isPressed(key)      -> boolean
+  isJustPressed(key)  -> boolean (resets after read)
+  getMouseDelta()     -> { x, y }
+  dispose()
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 9 — engine/CameraSystem.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Third-person camera that follows Kael.
+
+MODES:
+  'follow'    -> standard third-person (3.5m behind, 2m above)
+  'cinematic' -> for dialogue (fixed angle, letterbox bars)
+  'observe'   -> when Aldric is nearby, subtle tilt toward him
+  'cutscene'  -> full cinematic, player loses control
+
+FOLLOW CAMERA:
+  - Smooth lerp to target position (factor 0.08)
+  - Orbit horizontally with mouse delta
+  - Vertical limit: -10deg to +60deg
+  - Collision: raycast between camera and Kael, push camera forward
+
+CINEMATIC CAMERA:
+  - Predefined positions per dialogue node
+  - Smooth tween between positions (3 seconds)
+  - Add black letterbox bars (CSS overlay)
+
+OBSERVE BEHAVIOR:
+  - When Aldric is within 20 units of Kael
+  - Camera slowly drifts 15deg toward Aldric
+  - This is subtle — player may not notice
+  - Reinforces that Kael is watching the hero
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 10 — utils/noise.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Implement SimplexNoise from scratch (no external library).
+Export: noise2D(x, y), noise3D(x, y, z)
+Used by TerrainGen.js for heightmap generation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 11 — utils/save.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STORAGE KEY: 'npc_world_v1'
+
+Methods:
+  autosave(state)     -> debounced 5s, saves to localStorage
+  save(state)         -> immediate save
+  load()              -> returns parsed state or null
+  clear()             -> removes save
+  export()            -> downloads JSON file
+  hasSave()           -> boolean
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 12 — context/GameContext.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+React Context that bridges GameEngine (JS) with React UI.
+
+ACTIONS dispatched from engine via reactDispatch:
+  SET_PHASE          -> gameState.phase
+  UPDATE_KAEL        -> gameState.kael (partial)
+  UPDATE_HERO        -> gameState.hero (partial)
+  UPDATE_WORLD       -> gameState.world (partial)
+  UPDATE_TIME        -> gameState.time
+  SET_FLAG           -> gameState.flags[key] = value
+  ADD_LOG            -> worldLog entries (max 50)
+  OPEN_DIALOGUE      -> current dialogue node
+  CLOSE_DIALOGUE     -> null
+  ADD_INVENTORY      -> kael.inventory push item
+  REMOVE_INVENTORY   -> kael.inventory filter
+  TRIGGER_ENDING     -> endingId
+
+Provide via context:
+  gameState           -> full state object
+  worldLog            -> array of log entries
+  activeDialogue      -> current dialogue node or null
+  dispatch            -> React dispatch
+  engineRef           -> ref to GameEngine instance
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 COMPLETE — PROCEED TO STEP_3_3D_WORLD_AND_VISUALS.txt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

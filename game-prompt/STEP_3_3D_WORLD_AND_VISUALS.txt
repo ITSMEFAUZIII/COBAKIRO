@@ -1,0 +1,405 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║   NPC: NOBODY'S STORY — STEP 3 of 6                                     ║
+║   3D WORLD GENERATION + VISUAL DESIGN + BUILDINGS + SHADERS             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+INSTRUCTIONS FOR AI:
+Steps 1 and 2 are done (stack, folder structure, engine skeleton).
+Now build the complete 3D world and all visual systems.
+All geometry is PROCEDURAL — no external 3D asset files.
+Write complete working Three.js code for every section.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — WORLD SCALE AND LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+World size      : 2000 x 2000 units (centered at origin)
+Village center  : (0, 0, 0)
+Tavern          : (-50, 0, 10)     <- Kael's home base
+Blacksmith      : (20, 0, -15)
+Town well       : (0, 0, 0)        <- village center
+Market stalls   : (30, 0, 20)
+Church          : (-30, 0, -40)
+Graveyard       : (-60, 0, -60)
+Dungeon entrance: (200, -5, 350)
+Castle          : (800, 120, 600)  <- visible on horizon
+Black Market    : (-50, -15, 10)   <- underground below tavern
+Forest start    : ±300 units from center
+Mountains       : north, z > 500
+
+BIOME MAP:
+  PLAINS   -> |z| < 300, |x| < 300  (village zone, flat green)
+  FOREST   -> outside plains radius  (dense trees, dark)
+  MOUNTAIN -> z > 500                (rocky, grey-white peaks)
+  RIVER    -> flows from (0,0,500) south through (0,0,-400)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — world/terrain/TerrainGen.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generate terrain using SimplexNoise heightmap.
+
+IMPLEMENTATION:
+  - PlaneGeometry(2000, 2000, 256, 256)
+  - Rotate -90deg on X axis (flat ground)
+  - For each vertex, set Y = heightFunction(x, z)
+  - heightFunction:
+      base    = noise2D(x*0.003, z*0.003) * 30
+      detail  = noise2D(x*0.01,  z*0.01)  * 5
+      mountain= noise2D(x*0.001, z*0.001) * 120 (only z>400)
+      flat zone: if distance from origin < 200, lerp to 0
+  - computeVertexNormals() after vertex displacement
+  - MeshLambertMaterial with vertex colors per biome:
+      plains  : #4a7c59 (dark grass green)
+      forest  : #2d5a27 (deep forest green)
+      mountain: #8b7355 (rocky brown)
+      snow    : #e8e8e8 (peaks above y=80)
+  - receiveShadow = true
+
+ROAD GENERATION:
+  - Bezier curve from south (0,0,-800) to village (0,0,0)
+  - Another road east to dungeon
+  - Render as flat ribbon mesh, slightly above terrain
+  - Color: #a0826d (dusty brown)
+  - Width: 6 units
+
+RIVER GENERATION:
+  - Follow terrain valley from north to south
+  - Width: 8-12 units, varies with noise
+  - Use WaterSystem.js shader (see below)
+  - Add river rocks (scaled SphereGeometry, grey)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — world/terrain/WaterSystem.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Animated water using ShaderMaterial.
+
+VERTEX SHADER:
+  - Animate vertices with sin wave: y += sin(time + x*0.5) * 0.3
+  - Pass UV and worldPosition to fragment
+
+FRAGMENT SHADER:
+  - Base color: #1a3a5c (dark deep blue)
+  - Add animated foam: white edges using noise
+  - Fresnel effect for reflection shimmer
+  - Transparency: opacity 0.85
+  - Scroll UV for flow animation: uv.x += time * 0.02
+
+Update every frame: waterMaterial.uniforms.time.value += delta
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — world/props/Vegetation.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GRASS:
+  - InstancedMesh: 50,000 instances of thin quad geometry
+  - Random position within plains biome
+  - Random height 0.3-0.8, random lean angle
+  - Wind shader: vertices sway with sin(time + worldPos.x)
+  - Color: #3d6b47 to #5a8c5a (random per blade)
+  - LOD: only render within 80 units of camera
+
+TREES (forest biome):
+  - 3000 procedural trees
+  - Trunk: CylinderGeometry(0.3, 0.5, rand(4,8))
+    Color: #4a3728 (dark brown)
+  - Canopy: 2-3 stacked SphereGeometry, different sizes
+    Color: #1e4d2b to #2d6b3a (dark greens)
+  - Random rotation Y, slight random tilt
+  - CastShadow + receiveShadow
+
+BUSHES:
+  - 500 around village edges
+  - Cluster of 3-5 SphereGeometry(0.4-0.8)
+  - Color: #2d5a27
+
+DISTANT MOUNTAINS (LOD):
+  - Simple cone geometry for far mountains
+  - Only rendered when z > 400
+  - SnowCap: white SphereGeometry on top
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — world/buildings/Village.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build 15 unique village buildings procedurally.
+
+BUILDING GENERATION FUNCTION:
+  buildHouse({ x, z, width, depth, height, roofColor, wallColor })
+  - Walls: BoxGeometry(width, height, depth)
+  - Roof: custom prism geometry (extruded triangle)
+  - Windows: small BoxGeometry, emissive at night
+  - Door: slightly recessed BoxGeometry
+  - Combine into THREE.Group
+
+SPECIFIC BUILDINGS:
+
+TOWN WELL (center):
+  - Stone base: CylinderGeometry(1.5, 1.5, 1)
+  - Wooden frame: 4 CylinderGeometry poles + CrossBeam
+  - Roof: small pyramid
+  - Rope: TubeGeometry along CatmullRomCurve3
+  - Interactive (E key) -> shows lore text
+
+BLACKSMITH (20, 0, -15):
+  - Larger building, open front wall
+  - Anvil: custom geometry (box + cylinder)
+  - Forge fire: orange PointLight + fire particle system
+  - Spark particles: 20 particles shoot up, fade, reset
+  - Hammer sound when Aldric passes nearby
+
+MARKET STALLS (30, 0, 20):
+  - 4 stalls in row
+  - Cloth canopy: PlaneGeometry, slightly drooping
+  - Goods on table: small BoxGeometry clusters
+  - Colors: red, blue, green, yellow canopies
+
+CHURCH/SHRINE (-30, 0, -40):
+  - Tall narrow building
+  - Arched entrance (TorusGeometry half)
+  - Bell tower
+  - Stained glass window (colorful emissive planes)
+  - Interactive: Kael can pray (morale +10, one time)
+
+NOTICE BOARD (-5, 0, -10):
+  - Wooden post + plank
+  - 3 paper notes pinned to it (PlaneGeometry)
+  - Interactive: opens scrolling text UI
+  - Content changes per day (quest updates, warnings)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — world/buildings/Tavern.js (most detailed building)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The Tavern is Kael's domain. Build with maximum detail.
+
+EXTERIOR:
+  Name: "The Grey Flagon"
+  - Half-timber construction:
+    Wall base: BoxGeometry, plaster color #d4c4a8
+    Timber beams: dark BoxGeometry overlay pattern
+  - Roof: steep pitched, dark slate #3d3d3d
+  - Sign: hanging wooden plank (SwingAnimation on wind)
+    Text on sign: canvas texture "THE GREY FLAGON"
+  - 4 windows: warm orange emissive glow at night
+  - Chimney with smoke particles (grey, drift up + fade)
+  - Door: opens/closes based on player proximity
+
+INTERIOR (enter through door, scene does NOT change — just camera):
+  - Floor: dark wooden planks (PlaneGeometry grid pattern)
+  - Walls: stone lower half, timber upper half
+  - 6 tables + 4 chairs each (BoxGeometry, rounded look)
+  - BAR COUNTER:
+    * Long counter (BoxGeometry 8x1x0.8)
+    * Behind bar: shelf with 8 bottle geometries
+    * Bottles: CylinderGeometry with colored glass shader
+    * Taps: small cylinder + sphere handles
+  - FIREPLACE (back wall):
+    * Stone surround (BoxGeometry arch shape)
+    * Fire: PointLight (orange, flicker) + fire shader plane
+    * Animated glow on nearby surfaces
+  - STAIRS to upper floor (BoxGeometry steps)
+  - UPPER FLOOR: Kael's room (bed, small chest, window)
+  - TRAPDOOR: near fireplace, discoverable after Day 10
+    Hidden: alpha = 0 until discovered
+    Opens to Black Market below
+
+LIGHTING (interior):
+  - AmbientLight: #4a2800, intensity 0.3
+  - 6 candle PointLights: #f59e0b, intensity 0.8, distance 6
+    All flicker: intensity = 0.8 + sin(time * rand) * 0.2
+  - Fireplace PointLight: #ff6600, intensity 2, distance 15
+  - Window light (day only): directional, warm yellow
+
+PARTICLES:
+  - Dust motes: 200 small spheres, random slow float
+  - Fire embers: 30 particles from fireplace, orange
+  - Smoke: grey particles from chimney, drift up
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 7 — world/buildings/Castle.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Castle sits at (800, 120, 600) — always visible on horizon.
+
+LOD SYSTEM:
+  Distance < 200 : Full detail model
+  Distance 200-500: Medium LOD (fewer polygons)
+  Distance > 500 : Billboard (PlaneGeometry with canvas texture)
+
+FULL DETAIL MODEL:
+  - Main keep: tall BoxGeometry #5a5a6e (dark grey stone)
+  - 4 corner towers: CylinderGeometry, taller than keep
+  - Battlements: row of BoxGeometry crenellations on top
+  - Gate: arched opening, drawbridge (PlaneGeometry)
+  - Courtyard walls: BoxGeometry perimeter
+  - Dark Lord's tower: one tallest tower, purple PointLight glow
+  - Atmospheric fog around castle base (FogExp2 patch)
+
+ATMOSPHERIC LIGHTING:
+  - Purple PointLight at Dark Lord's tower (visible at night)
+  - Bloom effect makes it glow at distance
+  - If darkLordPower > 60: add crackling particle effects
+
+ENDING VARIATION:
+  - If hero defeated Dark Lord (good ending):
+    Castle gets warm lights, purple glow disappears
+  - If hero failed:
+    Castle shows explosion particle system + fire
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 8 — world/buildings/BlackMarket.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Underground chamber below The Grey Flagon tavern.
+Only accessible after player discovers trapdoor (Day 10+).
+
+LAYOUT:
+  - Stone tunnel descending 15 units below tavern floor
+  - Chamber: 20x20 units, low ceiling
+  - Dim red lighting (PointLight #8b0000, intensity 1.5)
+  - 3 vendor stalls with hooded figures (no faces)
+  - Shelves with suspicious goods (bottles, scrolls, weapons)
+
+ACCESS:
+  - Player interacts with trapdoor
+  - Camera descends through floor (animation)
+  - Scene stays same — just vertical movement
+
+VENDOR INTERACTION:
+  - Approach vendor within 2 units → E to trade
+  - Opens ChoiceMenu with available purchases
+  - Available items based on day and Kael's coins
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 9 — world/props/Lighting.js (dynamic world lighting)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Global dynamic lighting based on time of day:
+
+const LIGHT_PHASES = {
+  dawn:      { ambient: 0x334466, sun: 0xff8833, sunIntensity: 0.5 },
+  morning:   { ambient: 0x445566, sun: 0xffeedd, sunIntensity: 1.2 },
+  afternoon: { ambient: 0x334455, sun: 0xfff5e0, sunIntensity: 1.5 },
+  dusk:      { ambient: 0x443322, sun: 0xff5500, sunIntensity: 0.8 },
+  night:     { ambient: 0x111133, sun: 0x223366, sunIntensity: 0.1 },
+}
+
+Sun position calculation:
+  angle = (hour / 24) * Math.PI * 2
+  sun.position.x = Math.cos(angle) * 400
+  sun.position.y = Math.sin(angle) * 300
+  sun.position.z = -200
+
+Moon: separate smaller DirectionalLight, active only at night
+Stars: PointsGeometry, 2000 random points on sphere radius 900
+
+Torch flicker system:
+  - Every torch PointLight gets unique flicker frequency
+  - intensity = base + Math.sin(time * freq + phase) * 0.3
+  - Automatically lit at dusk, extinguished at dawn
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 10 — engine/WeatherSystem.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WEATHER TYPES: clear | cloudy | rain | storm | fog
+
+TRANSITIONS:
+  - Weather changes every 4-8 game days (random)
+  - Smooth transition over 1 real minute
+  - Rain affects NPC behavior (stay indoors)
+  - Storm: Aldric stays in tavern (useful for player)
+  - Fog: reduces draw distance to 80 units (eerie)
+
+RAIN SYSTEM:
+  - InstancedMesh: 5000 rain drop geometry (thin lines)
+  - Random positions in cylinder above camera
+  - Fall speed: 40 units/sec
+  - Reset to top when below ground
+  - Splash particles on ground impact (ring geometry)
+  - Rain sound: Web Audio API white noise filtered
+
+CLOUD SYSTEM:
+  - 20 cloud meshes (merged SphereGeometry clusters)
+  - Float at y=200-300
+  - Drift slowly on X axis
+  - Cast soft shadows (directionalLight shadow)
+
+FOG:
+  - Clear: scene.fog = FogExp2(0x87ceeb, 0.0008)
+  - Night: scene.fog = FogExp2(0x0a0a1a, 0.002)
+  - Foggy: scene.fog = FogExp2(0x8899aa, 0.006)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 11 — CHARACTER VISUAL DESIGN (3D procedural)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All characters are built from primitive geometry.
+Style: stylized low-poly, readable silhouettes.
+
+KAEL (player character):
+  Body    : CapsuleGeometry(0.3, 1.0) — muted brown #6b4c2a
+  Head    : SphereGeometry(0.25)      — skin tone #c4956a
+  Apron   : PlaneGeometry attached to front, grey #8b8b8b
+  Arms    : CylinderGeometry(0.1, 0.1, 0.7) x2
+  NO glow — intentionally dull and forgettable
+  Shadow  : subtle, small
+  SPECIAL : at influence >= 75, add barely-visible shimmer
+            (ShaderMaterial, opacity 0.15 — player may miss it)
+
+SIR ALDRIC (hero, AI controlled):
+  Body    : CapsuleGeometry(0.35, 1.1) — gold armor #C0A060
+  Head    : SphereGeometry(0.28)       — noble skin #d4a96a
+  Cape    : custom geometry, AnimationClip for flowing
+  Sword   : BoxGeometry strapped to back, metallic #c0c0c0
+  Shield  : CircleGeometry, heraldic geometry overlay
+  AURA    : UnrealBloom on character mesh (threshold 0.2)
+            Color: #ffd700, pulsing slow sine wave
+  QUEST MARKER: floating triangle above head, #ffd700
+                Bounces up/down, always visible
+  Shadow  : large, dramatic
+  SOUND   : subtle heroic hum when nearby (Web Audio)
+
+VILLAGERS (10 unique):
+  Use same base geometry as Kael but:
+  - Different color combinations per character
+  - Slight height/width randomization
+  - Simple hat or scarf accessory geometry
+  - NO glow, NO quest markers
+  - Named: Mira, Elder Voss, Tom the Smith, etc.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 12 — CHARACTER ANIMATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use Three.js AnimationMixer with KeyframeTrack animations.
+ALL animations are procedural (no animation files).
+
+KAEL ANIMATIONS:
+  idle        : subtle body sway, weight shift every 3s
+  walk        : leg swing, arm counterswing, 0.6s cycle
+  serve       : arm extend forward + tilt, 1.2s
+  clean_bar   : side-to-side arm wipe, 2s loop
+  observe     : head turn toward target, held
+  startled    : quick head snap + body recoil, 0.3s
+  sad_idle    : head droops, shoulders slump (low morale)
+
+ALDRIC ANIMATIONS:
+  heroic_idle : chest out, cape sway, slow breath, 4s loop
+  strut_walk  : exaggerated confident walk, 0.5s cycle
+  speech      : arm gesture sweeps, 2s cycle
+  victory     : sword raise, cape flare, 1.5s
+  combat_idle : ready stance, sword drawn
+  look_at_kael: head turn + brief squint (rare, triggered once)
+
+VILLAGER ANIMATIONS:
+  walk        : simple loop
+  idle        : varied (bow when Aldric passes, ignore Kael)
+  bow_to_hero : deep bow, 1.5s (triggers when Aldric nearby)
+  chat        : two villagers face each other, head nod loop
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 COMPLETE — PROCEED TO STEP_4_CHARACTERS_AND_AI.txt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
